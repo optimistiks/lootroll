@@ -1,7 +1,7 @@
 ## Install global packages
 
 ```
-npm install -g @microsoft/rush commitizen cz-conventional-changelog @commitlint/{cli,config-conventional}
+npm install -g @microsoft/rush commitizen cz-conventional-changelog @commitlint/{cli,config-conventional} prettier
 ```
 
 ## Configuration files
