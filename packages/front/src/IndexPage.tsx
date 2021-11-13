@@ -1,7 +1,11 @@
-import dynamic from "next/dynamic";
-
-const PeerComponent = dynamic(() => import("./PeerComponent"), { ssr: false });
-
+import { Container, Heading, Text } from "@chakra-ui/react";
+import { useRoom } from "./useRoom";
 export function IndexPage() {
-  return <PeerComponent />;
+  const { roomId } = useRoom();
+  return (
+    <Container maxW="container.lg">
+      <Heading>lootroll</Heading>
+      <Text>room id: {roomId}</Text>
+    </Container>
+  );
 }

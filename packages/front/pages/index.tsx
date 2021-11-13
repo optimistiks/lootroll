@@ -6,8 +6,8 @@ const Home: NextPage = () => {
   return (
     <div>
       <Head>
-        <title>LootRoll</title>
-        <meta name="description" content="Roll on your precious loot!" />
+        <title>lootroll</title>
+        <meta name="description" content="roll on your precious loot" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
       <IndexPage />
