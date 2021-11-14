@@ -5,47 +5,77 @@ import {
   collection,
   getFirestore,
   doc,
-  setDoc
+  setDoc,
+  getDoc
 } from "firebase/firestore";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import debug from "debug";
 import { FirebaseContext } from "./initFirebase";
+
+export enum LootrollErrorName {
+  notFound = "notFound"
+}
+
+class LootrollError implements Error {
+  name: LootrollErrorName;
+  message: string;
+  constructor(name: LootrollErrorName, message: string) {
+    this.name = name;
+    this.message = message;
+  }
+}
 
 interface RoomFields {
   roomKey: string;
 }
 
 class Room {
-  log = debug("lootroll:Room");
-  roomKey?: string;
-  constructor(data: Partial<RoomFields>) {
+  roomKey: string;
+  static log = debug("lootroll:Room");
+  constructor(data: RoomFields) {
+    Room.log("constructor() %o", { room: this, data });
     this.roomKey = data.roomKey;
-    this.log("constructor() %o", { room: this, data });
   }
   save() {
-    const ref = this.doc();
+    Room.log("save() %o", { room: this });
+    const ref = Room.doc(this.roomKey);
     this.roomKey = ref.id;
-    this.log("save() %o", { room: this });
     return setDoc(ref, this)
       .then(() => {
-        this.log("success save() %o", { room: this });
+        Room.log("save() success %o", { room: this });
+        return this;
       })
       .catch((err) => {
-        this.log("failure save() %o", { room: this });
+        Room.log("save() failure %o", { room: this, err });
         throw err;
       });
   }
-  doc() {
-    if (this.roomKey) {
-      return doc(this.collection(), this.roomKey);
+  static async fetch(roomKey: string) {
+    Room.log("fetch() %o", { roomKey });
+    const snap = await getDoc(Room.doc(roomKey));
+    const room = snap.data();
+    if (!room) {
+      const err = new LootrollError(LootrollErrorName.notFound, "room not found");
+      Room.log("fetch() failure %o", { err });
+      throw err;
+    }
+    Room.log("fetch() success %o", { snap });
+    return room;
+  }
+  static getNewId() {
+    return Room.doc().id;
+  }
+  static doc(roomKey?: string) {
+    if (roomKey) {
+      return doc(this.collection(), roomKey).withConverter(new RoomConverter());
     } else {
-      return doc(this.collection());
+      return doc(this.collection()).withConverter(new RoomConverter());
     }
   }
-  collection() {
-    return collection(this.db(), "room").withConverter(new RoomConverter());
+  static collection() {
+    return collection(Room.db(), "room").withConverter(new RoomConverter());
   }
-  db() {
+  static db() {
     return getFirestore();
   }
 }
@@ -53,38 +83,59 @@ class Room {
 class RoomConverter implements FirestoreDataConverter<Room> {
   log = debug("lootroll:RoomConverter");
   fromFirestore(snapshot: QueryDocumentSnapshot<RoomFields>): Room {
-    this.log("fromFirestore(), %o", { snapshot });
+    this.log("fromFirestore() %o", { snapshot });
     return new Room({ roomKey: snapshot.id });
   }
   toFirestore(room: WithFieldValue<Room>) {
-    this.log("toFirestore(), %o", { room });
+    this.log("toFirestore() %o", { room });
     return { roomKey: room.roomKey };
   }
 }
 
-const log = debug("lootroll:useRoom");
-export function useRoom() {
+export function useRoom(initialRoomKey?: string) {
+  const logRef = useRef<debug.Debugger>(debug("lootroll:useRoom"));
+  const log = logRef.current;
   const app = useContext(FirebaseContext);
-  const [roomId, setRoomId] = useState<string | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<LootrollError | null>(null);
   useEffect(() => {
     if (!app) {
       log("missing firebase app");
       return;
     }
-    const room = new Room({});
-    room
-      .save()
-      .then(() => {
-        if (room.roomKey) {
-          log("success save() %o", { room });
-          setRoomId(room.roomKey);
-        } else {
-          log("failure save() %o", { room });
-        }
-      })
-      .catch((err) => {
-        log("failure save() %o", err);
-      });
-  }, [app]);
-  return { roomId };
+    if (initialRoomKey) {
+      // fetch room
+      Room.fetch(initialRoomKey)
+        .then((room) => {
+          log("fetch() success %o", { room });
+          setRoom(room);
+        })
+        .catch((err) => {
+          log("fetch() failure %o", { err });
+          if (err instanceof LootrollError) {
+            setError(err);
+          }
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    } else {
+      // create new room
+      const room = new Room({ roomKey: Room.getNewId() });
+      room
+        .save()
+        .then((room) => {
+          log("save() success %o", { room });
+          setRoom(room);
+        })
+        .catch((err) => {
+          log("save() failure %o", { err });
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    }
+  }, [app, initialRoomKey, log]);
+  return { room, error, isLoading };
 }

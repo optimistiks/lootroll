@@ -1,6 +1,6 @@
 import type { NextPage } from "next";
 import Head from "next/head";
-import { IndexPage } from "../src/IndexPage";
+import { RoomPage } from "../src/RoomPage";
 
 const Home: NextPage = () => {
   return (
@@ -10,7 +10,7 @@ const Home: NextPage = () => {
         <meta name="description" content="roll on your precious loot" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <IndexPage />
+      <RoomPage />
     </div>
   );
 };
