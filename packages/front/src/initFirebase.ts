@@ -1,8 +1,5 @@
 import { initializeApp, FirebaseApp } from "firebase/app";
 import { createContext } from "react";
-import debug from "debug";
-
-const log = debug("lootroll:initFirebase");
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,6 +12,5 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-log("firebase app initialized %o", { app });
 
 export const FirebaseContext = createContext<FirebaseApp>(app);
