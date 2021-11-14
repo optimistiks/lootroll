@@ -1,15 +1,18 @@
-import "../styles/globals.css";
 import type { AppProps } from "next/app";
 import { ChakraProvider } from "@chakra-ui/react";
-import { useFirebase, FirebaseContext } from "../src/initFirebase";
+import { QueryClient, QueryClientProvider } from "react-query";
+import { useRef } from "react";
+import { FirebaseContext, app } from "../src/initFirebase";
 
 function MyApp({ Component, pageProps }: AppProps) {
-  const { app } = useFirebase();
+  const queryClientRef = useRef<QueryClient>(new QueryClient());
   return (
     <FirebaseContext.Provider value={app}>
-      <ChakraProvider>
-        <Component {...pageProps} />
-      </ChakraProvider>
+      <QueryClientProvider client={queryClientRef.current}>
+        <ChakraProvider>
+          <Component {...pageProps} />
+        </ChakraProvider>
+      </QueryClientProvider>
     </FirebaseContext.Provider>
   );
 }

@@ -8,22 +8,10 @@ import {
   setDoc,
   getDoc
 } from "firebase/firestore";
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import debug from "debug";
-import { FirebaseContext } from "./initFirebase";
-
-export enum LootrollErrorName {
-  notFound = "notFound"
-}
-
-class LootrollError implements Error {
-  name: LootrollErrorName;
-  message: string;
-  constructor(name: LootrollErrorName, message: string) {
-    this.name = name;
-    this.message = message;
-  }
-}
+import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useRouter } from "next/router";
 
 interface RoomFields {
   roomKey: string;
@@ -31,36 +19,17 @@ interface RoomFields {
 
 class Room {
   roomKey: string;
-  static log = debug("lootroll:Room");
   constructor(data: RoomFields) {
-    Room.log("constructor() %o", { room: this, data });
     this.roomKey = data.roomKey;
   }
   save() {
-    Room.log("save() %o", { room: this });
     const ref = Room.doc(this.roomKey);
     this.roomKey = ref.id;
-    return setDoc(ref, this)
-      .then(() => {
-        Room.log("save() success %o", { room: this });
-        return this;
-      })
-      .catch((err) => {
-        Room.log("save() failure %o", { room: this, err });
-        throw err;
-      });
+    return setDoc(ref, this).then(() => this);
   }
   static async fetch(roomKey: string) {
-    Room.log("fetch() %o", { roomKey });
     const snap = await getDoc(Room.doc(roomKey));
-    const room = snap.data();
-    if (!room) {
-      const err = new LootrollError(LootrollErrorName.notFound, "room not found");
-      Room.log("fetch() failure %o", { err });
-      throw err;
-    }
-    Room.log("fetch() success %o", { snap });
-    return room;
+    return snap.data();
   }
   static getNewId() {
     return Room.doc().id;
@@ -81,61 +50,59 @@ class Room {
 }
 
 class RoomConverter implements FirestoreDataConverter<Room> {
-  log = debug("lootroll:RoomConverter");
   fromFirestore(snapshot: QueryDocumentSnapshot<RoomFields>): Room {
-    this.log("fromFirestore() %o", { snapshot });
     return new Room({ roomKey: snapshot.id });
   }
   toFirestore(room: WithFieldValue<Room>) {
-    this.log("toFirestore() %o", { room });
     return { roomKey: room.roomKey };
   }
 }
 
+// the logic is as follows
+// when I open index page
+// there is no initial room key
+// so it should go straight to creating a new room
+
+// when I open room page
+// there is an initial room key
+// no creating new room should happen
+// it should fetch the room by id
+
 export function useRoom(initialRoomKey?: string) {
   const logRef = useRef<debug.Debugger>(debug("lootroll:useRoom"));
   const log = logRef.current;
-  const app = useContext(FirebaseContext);
-  const [room, setRoom] = useState<Room | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<LootrollError | null>(null);
+
+  const queryClient = useQueryClient();
+  const router = useRouter();
+
+  const [roomKey] = useState(initialRoomKey || Room.getNewId());
+
+  // fetch room by initial room key
+  const { isLoading, error, data: room } = useQuery(["room", { roomKey }], () => Room.fetch(roomKey));
+
+  // mutation to add a new room
+  const mutation = useMutation<Room, unknown, Room>(
+    (room) => {
+      return room.save();
+    },
+    {
+      onSuccess: (data) => {
+        queryClient.setQueryData(["room", { roomKey: data.roomKey }], data);
+        router.replace(`/room?id=${data.roomKey}`);
+      }
+    }
+  );
+
   useEffect(() => {
-    if (!app) {
-      log("missing firebase app");
-      return;
+    if (!initialRoomKey && mutation.isIdle) {
+      log("useEffect() no initialRoomKey, creating new room... %o", { initialRoomKey, roomKey });
+      mutation.mutate(new Room({ roomKey }));
     }
-    if (initialRoomKey) {
-      // fetch room
-      Room.fetch(initialRoomKey)
-        .then((room) => {
-          log("fetch() success %o", { room });
-          setRoom(room);
-        })
-        .catch((err) => {
-          log("fetch() failure %o", { err });
-          if (err instanceof LootrollError) {
-            setError(err);
-          }
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    } else {
-      // create new room
-      const room = new Room({ roomKey: Room.getNewId() });
-      room
-        .save()
-        .then((room) => {
-          log("save() success %o", { room });
-          setRoom(room);
-        })
-        .catch((err) => {
-          log("save() failure %o", { err });
-        })
-        .finally(() => {
-          setIsLoading(false);
-        });
-    }
-  }, [app, initialRoomKey, log]);
-  return { room, error, isLoading };
+  }, [initialRoomKey, mutation, roomKey, log]);
+
+  useEffect(() => {
+    log("useEffect() data %o", { isLoading, error, room });
+  }, [isLoading, error, room, log]);
+
+  return { room, isLoading, error };
 }

@@ -20,7 +20,8 @@
     "framer-motion": "^4",
     "@chakra-ui/icons": "~1.1.1",
     "firebase": "~9.4.1",
-    "debug": "~4.3.2"
+    "debug": "~4.3.2",
+    "react-query": "~3.32.3"
   },
   "devDependencies": {
     "@types/node": "16.11.7",
