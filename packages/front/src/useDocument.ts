@@ -1,62 +1,54 @@
 import { useEffect } from "react";
-import { useQuery, useQueryClient } from "react-query";
+import { useQuery, useQueryClient, UseQueryOptions } from "react-query";
 import {
   doc,
   getDoc,
   getFirestore,
   onSnapshot,
   FirestoreDataConverter,
+  Unsubscribe,
   DocumentData,
-  Unsubscribe
+  collection,
+  CollectionReference
 } from "firebase/firestore";
 
-interface UseDocumentOptions<DocumentType> {
+interface UseDocumentOptions extends UseQueryOptions<{ test: number } | undefined> {
   listen?: boolean;
-  converter?: FirestoreDataConverter<DocumentType>;
 }
 
-export function useDocument<DocumentType = DocumentData>(
-  path: string | null,
-  options?: UseDocumentOptions<DocumentType>
-) {
+export function useDocument(path: string | null, options: UseDocumentOptions = {}) {
+  const { listen, ...useQueryOptions } = options;
   const queryClient = useQueryClient();
-
   // set up a normal react-query query, make sure that passing null as path disables the query
-  const result = useQuery<unknown, unknown, DocumentType>(
+  const result = useQuery<{ test: number } | undefined>(
     [path],
     () => {
       if (!path) {
         return Promise.reject("missing path");
       }
-      if (options?.converter) {
-        return getDoc(doc(getFirestore(), path).withConverter(options.converter)).then((doc) => doc.data());
-      }
-      return getDoc(doc(getFirestore(), path)).then((doc) => doc.data());
+      const split = path.split("/");
+      const docKey = split.pop();
+      const collectionKey = split.join("/");
+      const collectionReference = collection(getFirestore(), collectionKey) as CollectionReference<{ test: number }>;
+      return getDoc<{ test: number }>(doc<{ test: number }>(collectionReference, docKey)).then((doc) => doc.data());
     },
     {
-      enabled: path !== null
+      enabled: path !== null,
+      ...useQueryOptions
     }
   );
-
   // set up a firestore listener that will update the query results with incoming data
   useEffect(() => {
     if (!options?.listen || !path) {
       return;
     }
     let unsub: Unsubscribe;
-    if (options.converter) {
-      unsub = onSnapshot(doc(getFirestore(), path).withConverter(options.converter), (doc) => {
-        queryClient.setQueryData([path], doc.data());
-      });
-    } else {
-      unsub = onSnapshot(doc(getFirestore(), path), (doc) => {
-        queryClient.setQueryData([path], doc.data());
-      });
-    }
+    unsub = onSnapshot(doc(getFirestore(), path), (doc) => {
+      queryClient.setQueryData([path], doc.data());
+    });
     return () => {
       unsub();
     };
   }, [path, options, queryClient]);
-
   return result;
 }
