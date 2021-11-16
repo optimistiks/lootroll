@@ -1,4 +1,4 @@
-import { useDocument } from "./useDocument";
+import { useDocument } from "./react-query-firestore/useDocument";
 import { RoomConverter } from "./RoomConverter";
 
 export function useListenRoom(roomKey: string) {
