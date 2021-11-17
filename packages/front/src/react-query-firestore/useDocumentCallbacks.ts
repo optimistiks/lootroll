@@ -10,9 +10,9 @@ import {
   deleteDoc as deleteFirestoreDoc
 } from "firebase/firestore";
 import { getDocRef } from "./utils";
-import { UseDocumentOptions } from "./types";
+import { UseDocumentOptions, UseDocumentPath } from "./types";
 
-export function useDocumentCallbacks<T>(path: string | null, options: UseDocumentOptions<T> = {}) {
+export function useDocumentCallbacks<T>(path: UseDocumentPath, options: UseDocumentOptions<T> = {}) {
   const queryClient = useQueryClient();
   const setDoc = useCallback(
     async (data: PartialWithFieldValue<T>, setOpts: SetOptions = {}) => {

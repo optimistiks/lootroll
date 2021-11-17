@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { useQueryClient } from "../../node_modules/react-query";
+import { useQueryClient } from "react-query";
 import { onSnapshot } from "firebase/firestore";
 import { getDocRef } from "./utils";
-import { UseDocumentOptions } from "./types";
+import { UseDocumentOptions, UseDocumentPath } from "./types";
 
-export function useDocumentOnSnapshot<T>(path: string | null, options: UseDocumentOptions<T> = {}) {
+export function useDocumentOnSnapshot<T>(path: UseDocumentPath, options: UseDocumentOptions<T> = {}) {
   const queryClient = useQueryClient();
   // set up a firestore listener that will update the query results with incoming data
   useEffect(() => {
