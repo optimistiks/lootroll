@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { useQueryClient } from "../../node_modules/react-query";
 import {
   getDoc,
   setDoc as setFirestoreDoc,
@@ -9,11 +8,25 @@ import {
   UpdateData,
   deleteDoc as deleteFirestoreDoc
 } from "firebase/firestore";
-import { getDocRef } from "./utils";
-import { UseDocumentOptions, UseDocumentPath } from "./types";
+import { getDocRef, getDocumentKeyFromDocumentPath } from "../utils";
+import { UseDocumentOptions, UseDocumentPath } from "../types";
+import { useQueryClient } from "react-query";
 
 export function useDocumentCallbacks<T>(path: UseDocumentPath, options: UseDocumentOptions<T> = {}) {
   const queryClient = useQueryClient();
+  const setQueryData = useCallback(
+    (data?: T) => {
+      if (!path) {
+        return;
+      }
+      const key = getDocumentKeyFromDocumentPath(path);
+      if (!key) {
+        return;
+      }
+      return queryClient.setQueryData(key, data);
+    },
+    [queryClient, path]
+  );
   const setDoc = useCallback(
     async (data: PartialWithFieldValue<T>, setOpts: SetOptions = {}) => {
       if (!path) {
@@ -22,9 +35,9 @@ export function useDocumentCallbacks<T>(path: UseDocumentPath, options: UseDocum
       const docRef = getDocRef<T>(path, options);
       await setFirestoreDoc(docRef, data, setOpts);
       const docSnap = await getDoc(docRef);
-      queryClient.setQueryData([path], docSnap.data());
+      setQueryData(docSnap.data());
     },
-    [path, options, queryClient]
+    [path, options, setQueryData]
   );
   const updateDoc = useCallback(
     async (data: UpdateData<T>) => {
@@ -34,9 +47,9 @@ export function useDocumentCallbacks<T>(path: UseDocumentPath, options: UseDocum
       const docRef = getDocRef<T>(path, options);
       await updateFirestoreDoc(docRef, data);
       const docSnap = await getDoc(docRef);
-      queryClient.setQueryData([path], docSnap.data());
+      setQueryData(docSnap.data());
     },
-    [path, options, queryClient]
+    [path, options, setQueryData]
   );
   const deleteDoc = useCallback(async () => {
     if (!path) {
@@ -45,7 +58,7 @@ export function useDocumentCallbacks<T>(path: UseDocumentPath, options: UseDocum
     const docRef = getDocRef<T>(path, options);
     await deleteFirestoreDoc(docRef);
     const docSnap = await getDoc(docRef);
-    queryClient.setQueryData([path], docSnap.data());
-  }, [path, options, queryClient]);
+    setQueryData(docSnap.data());
+  }, [path, options, setQueryData]);
   return { setDoc, updateDoc, deleteDoc };
 }

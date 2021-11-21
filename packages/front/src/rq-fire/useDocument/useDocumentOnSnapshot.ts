@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 import { useQueryClient } from "react-query";
 import { onSnapshot } from "firebase/firestore";
-import { getDocRef } from "./utils";
-import { UseDocumentOptions, UseDocumentPath } from "./types";
+import { getDocRef, getQueryKeyFromPath } from "../utils";
+import { UseDocumentOptions, UseDocumentPath } from "../types";
 
 export function useDocumentOnSnapshot<T>(path: UseDocumentPath, options: UseDocumentOptions<T> = {}) {
   const queryClient = useQueryClient();
@@ -12,7 +12,7 @@ export function useDocumentOnSnapshot<T>(path: UseDocumentPath, options: UseDocu
       return;
     }
     const unsub = onSnapshot(getDocRef<T>(path, options), (doc) => {
-      queryClient.setQueryData([path], doc.data());
+      queryClient.setQueryData(getQueryKeyFromPath(path), doc.data());
     });
     return () => {
       unsub();
